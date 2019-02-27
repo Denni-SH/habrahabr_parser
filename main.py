@@ -1,36 +1,43 @@
 from urllib.request import urlopen
 from lxml import html
-import json
+import datetime
 
-def main_page_parse():
+TODAY_DATE = "%s:" % str(datetime.date.today().strftime('%b %d %Y'))
+HABR_LINK = "//li/article[contains(@class,'post_preview')]/h2/a/"
+
+
+def page_parse():
     site_url = 'https://habrahabr.ru/'
     main_page = html.parse(urlopen(site_url)).getroot()
-    links_response = main_page.xpath('//li/article[contains(@class,"post_preview")]/h2/a/@href')
-    links = []
-    for link in links_response:
-        links.append(link)
-    return links
+    post_links = main_page.xpath(HABR_LINK + "@href")
+    post_titles = main_page.xpath(HABR_LINK + "text()")
+    return list(zip(post_titles, post_links))
 
-def posts_parse(links):
-    posts = []
-    for link in links:
-        url = link
-        post_page = html.parse(urlopen(url)).getroot()
-        post_title = post_page.xpath('//h1/span/text()')[0]
-        post_author = post_page.xpath('//header/a/@href')[0]
-        post_category_list = post_page.xpath('//ul[contains(@class,"post__hubs_full-post")]/li/a/text()')
-        posts.append({'title': post_title,
-                      'author': post_author,
-                      'categories': post_category_list,
-                      'url': url})
-    return posts
 
-def json_save(posts):
-    posts_file = open('best_day_posts.json', 'w', encoding='utf-8')
-    json.dump(posts, posts_file, ensure_ascii=False)
-    posts_file.close()
+def write_to_file(f, saved_posts):
+    file_text = f.read()
+    if TODAY_DATE not in file_text:
+        f.write(TODAY_DATE + "\n")
+        f.write("-" * len(TODAY_DATE) + '\n')
+        for post_title, post_link in saved_posts:
+            post_string = "- %s: %s \n" % (post_title, post_link)
+            f.write(post_string)
+            f.write("-" * len(post_string) + '\n')
+        f.write("=" * 120 + '\n')
+
+
+def save_to_file(saved_posts):
+    try:
+        with open('best_day_posts.txt', 'r+', encoding='utf-8') as f:
+            write_to_file(f, saved_posts)
+    except IOError:
+        with open('best_day_posts.txt', 'w+', encoding='utf-8') as f:
+            write_to_file(f, saved_posts)
+
 
 if __name__ == '__main__':
-    posts_links = main_page_parse()
-    posts_info = posts_parse(posts_links)
-    json_save(posts_info)
+    posts = page_parse()
+    save_to_file(posts)
+    for title, link in posts:
+        print_string = "- %s: %s" % (title, link)
+        print(print_string)
